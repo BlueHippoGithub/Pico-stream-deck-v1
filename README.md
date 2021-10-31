@@ -18,3 +18,8 @@ Required libraries/files:
   - adafruit_framebuf.py
   - adafruit_ssd1306.py
   - font5x8.bin
+
+
+Schematic
+
+![schematic](https://user-images.githubusercontent.com/34554892/139579792-43f90fb1-f607-46b3-8d2c-9b90908dfe25.png)
