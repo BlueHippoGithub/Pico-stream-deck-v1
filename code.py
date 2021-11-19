@@ -1,7 +1,7 @@
 import adafruit_ssd1306, board, busio, displayio, digitalio, usb_hid
 from adafruit_hid.consumer_control_code import ConsumerControlCode
 from adafruit_hid.consumer_control import ConsumerControl
-from adafruit_hid.keyboard_layout_us import KeyboardLayoutUS
+from keyboard_layout_win_da import KeyboardLayout
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
 from time import sleep
@@ -75,51 +75,60 @@ class MacroFunctions():
         sleep(0.05)
         self.layout.write("cmd\n")
 
-        sleep(1)
-        self.layout.write("ssh blue")
-
-        #I have a danish keyboard and this creates the @ sign on my PC, may vary for your layout
-        self.keyboard.press(Keycode.CONTROL, Keycode.ALT, Keycode.TWO)
-        self.keyboard.release(Keycode.CONTROL, Keycode.ALT, Keycode.TWO)
-
-        self.layout.write("192.168.1.114\n")
+        sleep(0.75)
+        self.layout.write("ssh blue@IPADDRESS\n")
 
         sleep(0.75)
-        self.layout.write("PASSWORD\n")
+        self.layout.write("SERVERPASSWORD\n")
 
-    #Consumer control uses the hexadecimals from the official USB HID documentation
+    def auto_update(self):
+        self.layout.write("sudo apt-get update -y && sudo apt-get upgrade -y && sudo apt-get dist-upgrade -y\n")
+    
+    def restart_server(self):
+        self.layout.write("sudo reboot\n")
+
     def playpause(self):
-        self.consumer_control.press(0xCD)
-        sleep(0.05)
-        self.consumer_control.release()
+        self.consumer_control.send(0xCD)
 
     def mute(self):
-        self.consumer_control.press(0xE2)
-        sleep(0.05)
-        self.consumer_control.release()
-    
+        self.consumer_control.send(0xE2)
+
+    def skip(self):
+        self.consumer_control.send(0xB5)
+
     def default_password(self):
-        self.layout.write("DEFAULTPASS")
-        sleep(0.01)
-        self.keyboard.send(Keycode.RETURN)
-    
+        self.layout.write("DEFAULTPASSWORD\n")
+
     def complex_password(self):
-        self.layout.write("COMPLEXPASS")
-        sleep(0.01)
-        self.keyboard.send(Keycode.RETURN)
+        self.layout.write("COMPLEXPASSWORD\n")
     
     def old_password(self):
-        self.layout.write("OLDPASS")
-        sleep(0.01)
-        self.keyboard.send(Keycode.RETURN)
+        self.layout.write("OLDPASSWORD\n")
 
     #Open spotify using win + r to open run
     def spotify(self):
         self.keyboard.press(Keycode.WINDOWS, Keycode.R)
         self.keyboard.release(Keycode.WINDOWS, Keycode.R)
-        sleep(0.05)
+        sleep(0.1)
         self.layout.write("spotify\n")
 
+    def discord(self):
+        self.keyboard.press(Keycode.WINDOWS, Keycode.R)
+        self.keyboard.release(Keycode.WINDOWS, Keycode.R)
+        sleep(0.1)
+        self.layout.write(r"C:\Users\Blue\AppData\Local\Discord\Update.exe --processStart Discord.exe")
+        self.keyboard.press(Keycode.RETURN)
+        self.keyboard.release(Keycode.RETURN)
+
+    def steam(self):
+        self.keyboard.press(Keycode.WINDOWS, Keycode.R)
+        self.keyboard.release(Keycode.WINDOWS, Keycode.R)
+        sleep(0.1)
+        self.layout.write("C:\Program Files (x86)\Steam\Steam.exe\n")
+
+
+#Layout class to handle different layouts
+#inherits macrofunctions to map functions to each screen/button
 class Layouts(MacroFunctions):
     def __init__(self, display, keyboard, layout, consumer_control):
         super().__init__(display, keyboard, layout, consumer_control)
@@ -130,16 +139,37 @@ class Layouts(MacroFunctions):
 
         self.functions = []
         self.home()
-
-    def home(self):
-        self.functions = [self.auto_ssh, self.passwords, self.mute, self.spotify]
-        self.display.display_text(1, "Auto SSH")
-        self.display.display_text(2, "Passwords")
-        self.display.display_text(3, "Mute PC")
-        self.display.display_text(4, "Spotify")
-        
         self.mainloop()
+
+    #Default start screen
+    def home(self):
+        self.functions = [self.server, self.passwords, self.mediaControls, self.programs]
+        self.display.display_text(1, "Server")
+        self.display.display_text(2, "Passwords")
+        self.display.display_text(3, "Media Controls")
+        self.display.display_text(4, "Programs")
+        
+    def server(self):
+        self.functions = [self.home, self.auto_ssh, self.auto_update, self.restart_server]
+        self.display.display_text(1, "Home Screen")
+        self.display.display_text(2, "Auto SSH")
+        self.display.display_text(3, "Auto update")
+        self.display.display_text(4, "Restart now")
+
+    def mediaControls(self):
+        self.functions = [self.home, self.mute, self.playpause, self.skip]
+        self.display.display_text(1, "Home Screen")
+        self.display.display_text(2, "Mute/Unmute")
+        self.display.display_text(3, "Play/Pause")
+        self.display.display_text(4, "Skip")
     
+    def programs(self):
+        self.functions = [self.home, self.spotify, self.discord, self.steam]
+        self.display.display_text(1, "Home Screen")
+        self.display.display_text(2, "Spotify")
+        self.display.display_text(3, "Discord")
+        self.display.display_text(4, "Steam")
+
     def passwords(self):
         self.functions = [self.home, self.default_password, self.complex_password, self.old_password]
         self.display.display_text(1, "Home Screen")
@@ -147,8 +177,7 @@ class Layouts(MacroFunctions):
         self.display.display_text(3, "Complex Password")
         self.display.display_text(4, "Old Password")
 
-        self.mainloop()
-
+    #Main loop to check if buttons have been pressed
     def mainloop(self):
         while True:
             y = 0
@@ -158,12 +187,12 @@ class Layouts(MacroFunctions):
                     while(i.value == True):
                         pass
                 y += 1
-
             sleep(0.05)
 
+#Start everything up
 def main():
     keyboard=Keyboard(usb_hid.devices)
-    layout = KeyboardLayoutUS(keyboard)
+    layout = KeyboardLayout(keyboard)
     consumer_control = ConsumerControl(usb_hid.devices)
 
     display = Display(scl=board.GP1, sda=board.GP0, 
@@ -175,3 +204,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
